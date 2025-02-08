@@ -1,32 +1,43 @@
 use ratatui::{
-    layout::{Offset, Rect},
+    layout::Rect,
     style::Style,
-    widgets::{Block, Paragraph},
-    Frame,
+    widgets::{Block, Clear, Paragraph, Widget, Wrap},
 };
 
-use crate::{app::color_scheme, components::home::Operation};
+use super::Operation;
+use crate::app::color_scheme;
 
 #[derive(Clone)]
 pub enum Element {
     Box { area: Rect },
+    Text { area: Rect, content: String },
 }
 
 impl Element {
     pub fn name(&self) -> String {
-        "Box".to_owned()
+        match self {
+            Self::Box { .. } => "Box".into(),
+            Self::Text { content, .. } => format!("Text \"{}\"", content),
+        }
     }
 
     pub fn area(&self) -> &Rect {
         match self {
-            Self::Box { area } => area,
+            Self::Box { area } | Self::Text { area, .. } => area,
         }
     }
 
-    pub fn draw_to(
+    pub fn transform<F: Fn(&Rect) -> Rect>(&mut self, transform: F) {
+        match self {
+            Self::Box { ref mut area } | Self::Text { ref mut area, .. } => {
+                *area = transform(area);
+            }
+        }
+    }
+
+    pub(crate) fn draw_to(
         &self,
-        frame: &mut Frame,
-        canvas_region: &Rect,
+        buffer: &mut ratatui::prelude::Buffer,
         selected: bool,
         operation: &Option<Operation>,
     ) {
@@ -39,36 +50,25 @@ impl Element {
         };
 
         match self {
-            Element::Box { area } => {
-                let area = operation
-                    .map(|x| x.apply_transform(area))
-                    .unwrap_or(*area)
-                    .offset(Offset {
-                        x: canvas_region.x as i32,
-                        y: canvas_region.y as i32,
-                    });
+            Self::Box { area } => {
+                let area = match &operation {
+                    Some(x) => x.apply_transform(area),
+                    None => *area,
+                };
 
-                frame.render_widget(
-                    Paragraph::new(
-                        (0..area.height)
-                            .map(|_| {
-                                let mut s = (0..area.width).map(|_| ' ').collect::<String>();
-                                s.push('\n');
-                                s
-                            })
-                            .collect::<String>(),
-                    )
-                    .block(Block::bordered().style(style)),
-                    area.clone(),
-                );
+                Clear.render(area, buffer);
+                Block::bordered().style(style).render(area, buffer);
             }
-        }
-    }
+            Self::Text { area, content } => {
+                let area = match &operation {
+                    Some(x) => x.apply_transform(area),
+                    None => *area,
+                };
 
-    pub fn transform<F: Fn(&Rect) -> Rect>(&mut self, transform: F) {
-        match self {
-            Element::Box { ref mut area } => {
-                *area = transform(area);
+                Paragraph::new(content.as_str())
+                    .style(style)
+                    .wrap(Wrap { trim: false })
+                    .render(area, buffer);
             }
         }
     }

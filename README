@@ -6,7 +6,7 @@
 ══════════════════ plaintext charts and drawings from your terminal! ══
 
   sketshy is a TUI tool for designing "ASCII art", plaintext diagrams
-  and more. It's like if Excalidraw and Vim had a kit that grew up to
+  and more. It's like if Excalidraw and Vim had a kid that grew up to
   run a late-90s aesthetic Tumblr blog.
 
   ┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
@@ -76,8 +76,8 @@
 
   Canvas
   
-    [v] Cursor tool       [%] Select all
-    [b] Box tool          [x] Delete
+    [v] Cursor tool       [%] Select all           [↑]
+    [b] Box tool          [x] Delete            [←][↓][→] Move around
     [l] Line tool         [y] Copy
     [i] Text tool         [p] Paste
 
@@ -97,18 +97,20 @@
   
   [x] Cursor tool
   [x] Box tool
-  [ ] Line tool
   [ ] Text tool
-  [ ] Paintbrush tool
+  [ ] Line tool
+  [ ] Paint tool
+  [ ] Frame tool
 
-  [ ] Scrolling
+  [x] Scrolling
+  [x] Ruler and Guides
 
   [ ] Grouping
   [ ] Flattening
 
   [ ] Command palette
       [ ] New, Save, Load, Quit
-      [ ] Plaintext export
+      [ ] Plaintext export - export all, selected, frame etc
       [ ] Plaintext import
 
   [ ] Setup wizard
@@ -125,4 +127,6 @@
       [ ] Line styling: Arrowheads, Thickness
 
   [ ] Config
+      [ ] Keymap
       [ ] Theming
+

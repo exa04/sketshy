@@ -1,18 +1,18 @@
-use std::{collections::VecDeque, ops::Not};
+use std::{collections::HashSet, ops::Not};
 
 use color_eyre::Result;
-use crossterm::event::{KeyEvent, MouseButton, MouseEvent, MouseEventKind};
+use crossterm::event::{KeyEvent, KeyModifiers, MouseButton, MouseEvent, MouseEventKind};
 use layout::{Flex, Offset};
 use ratatui::{prelude::*, widgets::*};
 use tokio::sync::mpsc::UnboundedSender;
 
 use super::Component;
-use crate::{action::Action, app::color_scheme, config::Config, drawing::Element};
-
-#[derive(Default)]
-struct DrawingCanvas {
-    pub elements: VecDeque<Element>,
-}
+use crate::{
+    action::Action,
+    app::color_scheme,
+    config::Config,
+    drawing::{Direction, DrawingCanvas, Element, Operation},
+};
 
 #[derive(PartialEq, Eq)]
 enum Tool {
@@ -23,90 +23,14 @@ enum Tool {
 }
 
 const LIST_WIDTH: u16 = 14;
+const STYLE_WIDTH: u16 = 20;
+
+const SCROLL_STEP: u16 = 4;
 
 impl Default for Tool {
     fn default() -> Self {
         Self::Cursor
     }
-}
-
-#[derive(Clone, Copy)]
-pub enum Operation {
-    Selection {
-        origin: Position,
-        second: Position,
-    },
-    Move {
-        origin: Position,
-        second: Position,
-    },
-    Resize {
-        direction: Direction,
-        origin: Position,
-        second: Position,
-    },
-}
-
-impl Operation {
-    pub fn apply_transform(&self, area: &Rect) -> Rect {
-        match self {
-            Operation::Move { origin, second } => area.offset(Offset {
-                x: second.x as i32 - origin.x as i32,
-                y: second.y as i32 - origin.y as i32,
-            }),
-            Operation::Resize {
-                direction,
-                origin,
-                second,
-            } => match direction {
-                Direction::TopLeft => Rect {
-                    x: (area.x as i32
-                        + (second.x as i32 - origin.x as i32).min(area.width as i32 - 2))
-                        as u16,
-                    y: (area.y as i32
-                        + (second.y as i32 - origin.y as i32).min(area.height as i32 - 2))
-                        as u16,
-                    width: (area.width as i32 - (second.x as i32 - origin.x as i32)).max(2) as u16,
-                    height: (area.height as i32 - (second.y as i32 - origin.y as i32)).max(2)
-                        as u16,
-                },
-                Direction::TopRight => Rect {
-                    x: area.x,
-                    y: (area.y as i32
-                        + (second.y as i32 - origin.y as i32).min(area.height as i32 - 2))
-                        as u16,
-                    width: (area.width as i32 + (second.x as i32 - origin.x as i32)).max(2) as u16,
-                    height: (area.height as i32 - (second.y as i32 - origin.y as i32)).max(2)
-                        as u16,
-                },
-                Direction::BottomLeft => Rect {
-                    x: (area.x as i32
-                        + (second.x as i32 - origin.x as i32).min(area.width as i32 - 2))
-                        as u16,
-                    y: area.y,
-                    width: (area.width as i32 - (second.x as i32 - origin.x as i32)).max(2) as u16,
-                    height: (area.height as i32 + (second.y as i32 - origin.y as i32)).max(2)
-                        as u16,
-                },
-                Direction::BottomRight => Rect {
-                    x: area.x,
-                    y: area.y,
-                    width: (area.width as i32 + (second.x as i32 - origin.x as i32)).max(2) as u16,
-                    height: (area.height as i32 + (second.y as i32 - origin.y as i32)).max(2)
-                        as u16,
-                },
-            },
-            _ => area.clone(),
-        }
-    }
-}
-
-#[derive(Clone, Copy, Debug)]
-pub enum Direction {
-    TopLeft,
-    TopRight,
-    BottomLeft,
-    BottomRight,
 }
 
 #[derive(Default)]
@@ -115,8 +39,9 @@ pub struct Home {
     config: Config,
     current_tool: Tool,
     current_operation: Option<Operation>,
-    selected_elements: Vec<usize>,
+    selected_elements: HashSet<usize>,
     canvas: DrawingCanvas,
+    scroll_offset: Position,
 }
 
 impl Home {
@@ -154,239 +79,330 @@ impl Component for Home {
     }
 
     fn handle_key_event(&mut self, key: KeyEvent) -> Result<Option<Action>> {
+        use crossterm::event::{KeyCode::*, KeyModifiers};
+
         match key {
             KeyEvent {
-                code,
+                code: Char('v'), ..
+            } => {
+                self.update_tool(Tool::Cursor);
+                Ok(Some(Action::RenderBuffer))
+            }
+            KeyEvent {
+                code: Char('b'), ..
+            } => {
+                self.update_tool(Tool::Box);
+                Ok(Some(Action::RenderBuffer))
+            }
+            KeyEvent {
+                code: Char('l'), ..
+            } => {
+                self.update_tool(Tool::Line);
+                Ok(Some(Action::RenderBuffer))
+            }
+            KeyEvent {
+                code: Char('i'), ..
+            } => {
+                self.update_tool(Tool::Text);
+                Ok(Some(Action::RenderBuffer))
+            }
+            KeyEvent {
+                code: Char('%'), ..
+            }
+            | KeyEvent {
+                code: Char('a'),
+                modifiers: KeyModifiers::CONTROL,
+                ..
+            } => {
+                self.update_tool(Tool::Cursor);
+                self.selected_elements =
+                    (0..self.canvas.elements.len()).collect::<HashSet<usize>>();
+                Ok(Some(Action::RenderBuffer))
+            }
+            KeyEvent {
+                code: Char('d'), ..
+            }
+            | KeyEvent { code: Delete, .. } => {
+                self.canvas.elements = self
+                    .canvas
+                    .elements
+                    .iter()
+                    .enumerate()
+                    .filter_map(|(i, el)| {
+                        self.selected_elements
+                            .contains(&i)
+                            .not()
+                            .then_some(el.clone())
+                    })
+                    .collect::<Vec<_>>()
+                    .into();
+                self.selected_elements.clear();
+                Ok(Some(Action::RenderBuffer))
+            }
+            KeyEvent {
+                code: Up,
                 modifiers: _,
                 kind: _,
                 state: _,
-            } => match code {
-                crossterm::event::KeyCode::Char('v') => self.update_tool(Tool::Cursor),
-                crossterm::event::KeyCode::Char('b') => self.update_tool(Tool::Box),
-                crossterm::event::KeyCode::Char('l') => self.update_tool(Tool::Line),
-                crossterm::event::KeyCode::Char('i') => self.update_tool(Tool::Text),
-                crossterm::event::KeyCode::Char('a') => {
-                    self.update_tool(Tool::Cursor);
-                    self.selected_elements = (0..self.canvas.elements.len()).collect::<Vec<_>>()
-                }
-                crossterm::event::KeyCode::Char('d') | crossterm::event::KeyCode::Delete => {
-                    self.canvas.elements = self
-                        .canvas
-                        .elements
-                        .iter()
-                        .enumerate()
-                        .filter_map(|(i, el)| {
-                            self.selected_elements
-                                .contains(&i)
-                                .not()
-                                .then_some(el.clone())
-                        })
-                        .collect::<Vec<_>>()
-                        .into();
-                    self.selected_elements.clear();
-                }
-                _ => {}
-            },
-        };
-
-        Ok(None)
+            } => {
+                self.scroll_offset.y = self.scroll_offset.y.saturating_sub(SCROLL_STEP);
+                Ok(Some(Action::RenderBuffer))
+            }
+            KeyEvent {
+                code: Down,
+                modifiers: _,
+                kind: _,
+                state: _,
+            } => {
+                self.scroll_offset.y += SCROLL_STEP;
+                Ok(Some(Action::RenderBuffer))
+            }
+            KeyEvent {
+                code: Left,
+                modifiers: _,
+                kind: _,
+                state: _,
+            } => {
+                self.scroll_offset.x = self.scroll_offset.x.saturating_sub(SCROLL_STEP * 2);
+                Ok(Some(Action::RenderBuffer))
+            }
+            KeyEvent {
+                code: Right,
+                modifiers: _,
+                kind: _,
+                state: _,
+            } => {
+                self.scroll_offset.x += SCROLL_STEP * 2;
+                Ok(Some(Action::RenderBuffer))
+            }
+            _ => Ok(None),
+        }
     }
 
     fn handle_mouse_event(&mut self, mouse: MouseEvent) -> Result<Option<Action>> {
-        match mouse {
-            MouseEvent {
-                kind,
-                column,
-                row,
-                modifiers: _,
-            } => {
-                if column < LIST_WIDTH {
-                    Ok(None)
-                } else {
-                    match kind {
-                        MouseEventKind::Down(MouseButton::Left) => {
-                            let column = column - LIST_WIDTH;
-                            match self.current_tool {
-                                Tool::Cursor => {
-                                    if self
-                                        .selected_elements
-                                        .iter()
-                                        .map(|i| &self.canvas.elements[*i])
-                                        .filter(|el| {
-                                            el.area().contains(Position { x: column, y: row })
-                                        })
-                                        .next()
-                                        .is_some()
-                                    {
-                                        self.current_operation = Some(Operation::Move {
-                                            origin: Position { x: column, y: row },
-                                            second: Position { x: column, y: row },
-                                        })
-                                    } else {
-                                        if self.selected_elements.len() == 1 {
-                                            if let Some(direction) = self
-                                                .selected_elements
-                                                .iter()
-                                                .filter_map(|i| {
-                                                    let area = self.canvas.elements[*i].area();
+        let MouseEvent {
+            kind,
+            column,
+            row,
+            modifiers,
+        } = mouse;
 
-                                                    if area.x.saturating_sub(1) == column
-                                                        && area.y.saturating_sub(1) == row
-                                                    {
-                                                        Some(Direction::TopLeft)
-                                                    } else if (area.x + area.width) == column
-                                                        && area.y.saturating_sub(1) == row
-                                                    {
-                                                        Some(Direction::TopRight)
-                                                    } else if area.x.saturating_sub(1) == column
-                                                        && (area.y + area.height) == row
-                                                    {
-                                                        Some(Direction::BottomLeft)
-                                                    } else if (area.x + area.width) == column
-                                                        && (area.y + area.height) == row
-                                                    {
-                                                        Some(Direction::BottomRight)
-                                                    } else {
-                                                        None
-                                                    }
-                                                })
-                                                .next()
-                                            {
-                                                self.current_operation = Some(Operation::Resize {
-                                                    direction,
-                                                    origin: Position { x: column, y: row },
-                                                    second: Position { x: column, y: row },
-                                                });
-                                                return Ok(None);
-                                            }
-                                        }
-                                        self.current_operation = Some(Operation::Selection {
-                                            origin: Position { x: column, y: row },
-                                            second: Position { x: column, y: row },
-                                        });
+        if column < LIST_WIDTH {
+            return Ok(None);
+        }
 
-                                        self.selected_elements.clear();
+        match kind {
+            MouseEventKind::Down(MouseButton::Left) => {
+                let row = row + self.scroll_offset.y;
+                let column = column - LIST_WIDTH + self.scroll_offset.x;
+                match self.current_tool {
+                    Tool::Cursor => {
+                        if self
+                            .selected_elements
+                            .iter()
+                            .map(|i| &self.canvas.elements[*i])
+                            .any(|el| el.area().contains(Position { x: column, y: row }))
+                        {
+                            self.current_operation = Some(Operation::Move {
+                                origin: Position { x: column, y: row },
+                                second: Position { x: column, y: row },
+                            });
+                            Ok(None)
+                        } else {
+                            if self.selected_elements.len() == 1 {
+                                if let Some(direction) = self
+                                    .selected_elements
+                                    .iter()
+                                    .filter_map(|i| {
+                                        let area = self.canvas.elements[*i].area();
 
-                                        if let Some(x) = self
-                                            .canvas
-                                            .elements
-                                            .iter()
-                                            .enumerate()
-                                            .rev()
-                                            .filter_map(|(i, el)| {
-                                                el.area()
-                                                    .contains(Position { x: column, y: row })
-                                                    .then_some(i)
-                                            })
-                                            .next()
+                                        if area.x.saturating_sub(1) == column
+                                            && area.y.saturating_sub(1) == row
                                         {
-                                            self.selected_elements.push(x);
+                                            Some(Direction::TopLeft)
+                                        } else if area.x + area.width == column
+                                            && area.y.saturating_sub(1) == row
+                                        {
+                                            Some(Direction::TopRight)
+                                        } else if area.x.saturating_sub(1) == column
+                                            && area.y + area.height == row
+                                        {
+                                            Some(Direction::BottomLeft)
+                                        } else if area.x + area.width == column
+                                            && area.y + area.height == row
+                                        {
+                                            Some(Direction::BottomRight)
+                                        } else {
+                                            None
                                         }
-                                    }
-                                }
-                                Tool::Box => {
-                                    self.current_operation = Some(Operation::Selection {
-                                        origin: (column, row).into(),
-                                        second: (column, row).into(),
+                                    })
+                                    .next()
+                                {
+                                    self.current_operation = Some(Operation::Resize {
+                                        direction,
+                                        origin: Position { x: column, y: row },
+                                        second: Position { x: column, y: row },
                                     });
+                                    return Ok(Some(Action::RenderBuffer));
                                 }
-                                _ => {}
                             }
-                            Ok(None)
-                        }
-                        MouseEventKind::Up(MouseButton::Left) => {
-                            match self.current_tool {
-                                Tool::Box => match self.current_operation {
-                                    Some(Operation::Selection { origin, second }) => {
-                                        let area = Rect {
-                                            x: origin.x.min(second.x),
-                                            y: origin.y.min(second.y),
-                                            width: origin.x.abs_diff(second.x) + 1,
-                                            height: origin.y.abs_diff(second.y) + 1,
-                                        };
+                            self.current_operation = Some(Operation::Selection {
+                                origin: Position { x: column, y: row },
+                                second: Position { x: column, y: row },
+                            });
 
-                                        if area.width > 1 && area.height > 1 {
-                                            self.canvas.elements.push_back(Element::Box { area });
-                                            self.reset_tool();
-                                            self.selected_elements
-                                                .push(self.canvas.elements.len() - 1);
-                                        }
-                                    }
-                                    _ => {}
-                                },
-                                Tool::Cursor => {
-                                    if let Some(op) = self.current_operation {
-                                        for i in &self.selected_elements {
-                                            self.canvas.elements[*i]
-                                                .transform(|area| op.apply_transform(area));
-                                        }
-                                    }
-                                }
-                                _ => {}
+                            if modifiers & KeyModifiers::ALT != KeyModifiers::ALT {
+                                self.selected_elements.clear();
                             }
-                            self.current_operation = None;
-                            Ok(None)
-                        }
-                        MouseEventKind::Drag(MouseButton::Left) => {
-                            let column = column - LIST_WIDTH;
-                            match self.current_tool {
-                                Tool::Box => {
-                                    if let Some(ref mut operation) = &mut self.current_operation {
-                                        match operation {
-                                            Operation::Selection { origin: _, second } => {
-                                                second.x = column;
-                                                second.y = row;
-                                            }
-                                            _ => {}
-                                        }
-                                    }
-                                }
-                                Tool::Cursor => match &mut self.current_operation {
-                                    Some(Operation::Selection { origin, second }) => {
-                                        second.x = column;
-                                        second.y = row;
 
-                                        let area = Rect {
-                                            x: origin.x.min(second.x),
-                                            y: origin.y.min(second.y),
-                                            width: origin.x.abs_diff(second.x) + 1,
-                                            height: origin.y.abs_diff(second.y) + 1,
-                                        };
-
-                                        self.selected_elements = self
-                                            .canvas
-                                            .elements
-                                            .iter()
-                                            .enumerate()
-                                            .filter_map(|(i, el)| {
-                                                el.area().intersects(area).then_some(i)
-                                            })
-                                            .collect::<Vec<_>>();
-                                    }
-                                    Some(Operation::Move { origin: _, second })
-                                    | Some(Operation::Resize {
-                                        direction: _,
-                                        origin: _,
-                                        second,
-                                    }) => {
-                                        second.x = column;
-                                        second.y = row;
-                                    }
-                                    _ => {}
-                                },
-                                _ => {}
+                            if let Some(x) = self
+                                .canvas
+                                .elements
+                                .iter()
+                                .enumerate()
+                                .rev()
+                                .filter_map(|(i, el)| {
+                                    el.area()
+                                        .contains(Position { x: column, y: row })
+                                        .then_some(i)
+                                })
+                                .next()
+                            {
+                                self.selected_elements.insert(x);
                             }
-                            Ok(None)
+                            Ok(Some(Action::RenderBuffer))
                         }
-                        // MouseEventKind::Moved => todo!(),
-                        // MouseEventKind::ScrollDown => todo!(),
-                        // MouseEventKind::ScrollUp => todo!(),
-                        // MouseEventKind::ScrollLeft => todo!(),
-                        // MouseEventKind::ScrollRight => todo!(),
-                        _ => Ok(None),
                     }
+                    Tool::Box | Tool::Text => {
+                        self.current_operation = Some(Operation::Selection {
+                            origin: (column, row).into(),
+                            second: (column, row).into(),
+                        });
+                        Ok(None)
+                    }
+                    _ => Ok(None),
                 }
             }
+            MouseEventKind::Drag(MouseButton::Left) => {
+                let row = row + self.scroll_offset.y;
+                let column = column - LIST_WIDTH + self.scroll_offset.x;
+                match self.current_tool {
+                    Tool::Box | Tool::Text => {
+                        if let Some(Operation::Selection { origin: _, second }) =
+                            &mut self.current_operation
+                        {
+                            second.x = column;
+                            second.y = row;
+                        }
+                        Ok(Some(Action::RenderBuffer))
+                    }
+                    Tool::Cursor => match &mut self.current_operation {
+                        Some(Operation::Selection { origin, second }) => {
+                            second.x = column;
+                            second.y = row;
+
+                            let area = Rect {
+                                x: origin.x.min(second.x),
+                                y: origin.y.min(second.y),
+                                width: origin.x.abs_diff(second.x) + 1,
+                                height: origin.y.abs_diff(second.y) + 1,
+                            };
+
+                            self.selected_elements = self
+                                .canvas
+                                .elements
+                                .iter()
+                                .enumerate()
+                                .filter_map(|(i, el)| el.area().intersects(area).then_some(i))
+                                .collect::<HashSet<_>>();
+
+                            Ok(Some(Action::RenderBuffer))
+                        }
+                        Some(Operation::Move { origin: _, second })
+                        | Some(Operation::Resize {
+                            direction: _,
+                            origin: _,
+                            second,
+                        }) => {
+                            second.x = column;
+                            second.y = row;
+                            Ok(Some(Action::RenderBuffer))
+                        }
+                        _ => Ok(None),
+                    },
+                    _ => Ok(None),
+                }
+            }
+            MouseEventKind::Up(MouseButton::Left) => match self.current_tool {
+                Tool::Box => {
+                    if let Some(Operation::Selection { origin, second }) = self.current_operation {
+                        let area = Rect {
+                            x: origin.x.min(second.x),
+                            y: origin.y.min(second.y),
+                            width: origin.x.abs_diff(second.x) + 1,
+                            height: origin.y.abs_diff(second.y) + 1,
+                        };
+
+                        if area.width > 1 && area.height > 1 {
+                            self.canvas.elements.push_back(Element::Box { area });
+                            self.reset_tool();
+                            self.selected_elements
+                                .insert(self.canvas.elements.len() - 1);
+                        }
+                    }
+                    self.current_operation = None;
+                    Ok(Some(Action::RenderBuffer))
+                }
+                Tool::Text => {
+                    if let Some(Operation::Selection { origin, second }) = self.current_operation {
+                        let area = Rect {
+                            x: origin.x.min(second.x),
+                            y: origin.y.min(second.y),
+                            width: origin.x.abs_diff(second.x) + 1,
+                            height: origin.y.abs_diff(second.y) + 1,
+                        };
+
+                        if area.width > 1 && area.height > 1 {
+                            self.canvas.elements.push_back(Element::Text {
+                                area,
+                                content: "cock and ball torture from wikipedia, the free encylopedia. cock and ball torture is an awesome activity conjured up by the wisest minds in existance.".into(),
+                            });
+                            self.reset_tool();
+                            self.selected_elements
+                                .insert(self.canvas.elements.len() - 1);
+                        }
+                    }
+                    self.current_operation = Some(Operation::EditText { position: 0 });
+                    Ok(Some(Action::RenderBuffer))
+                }
+                Tool::Cursor => {
+                    if let Some(op) = &self.current_operation {
+                        for i in &self.selected_elements {
+                            self.canvas.elements[*i].transform(|area| op.apply_transform(area));
+                        }
+                    }
+                    self.current_operation = None;
+                    Ok(Some(Action::RenderBuffer))
+                }
+                _ => Ok(None),
+            },
+            MouseEventKind::ScrollDown => {
+                self.scroll_offset.y += SCROLL_STEP;
+                Ok(Some(Action::RenderBuffer))
+            }
+            MouseEventKind::ScrollUp => {
+                self.scroll_offset.y = self.scroll_offset.y.saturating_sub(SCROLL_STEP);
+                Ok(Some(Action::RenderBuffer))
+            }
+            MouseEventKind::ScrollRight => {
+                self.scroll_offset.x += SCROLL_STEP;
+                Ok(Some(Action::RenderBuffer))
+            }
+            MouseEventKind::ScrollLeft => {
+                self.scroll_offset.x = self.scroll_offset.x.saturating_sub(SCROLL_STEP);
+                Ok(Some(Action::RenderBuffer))
+            }
+            _ => Ok(None),
         }
     }
 
@@ -397,6 +413,10 @@ impl Component for Home {
             }
             Action::Render => {
                 // add any logic here that should run on every render
+            }
+            Action::RenderBuffer => {
+                self.canvas
+                    .render(&self.selected_elements, &self.current_operation);
             }
             _ => {}
         }
@@ -412,7 +432,7 @@ impl Component for Home {
         );
 
         let [layers_area, canvas_area, style_area] =
-            Layout::horizontal([Length(LIST_WIDTH), Fill(1), Length(24)]).areas(area);
+            Layout::horizontal([Length(LIST_WIDTH), Fill(1), Length(STYLE_WIDTH)]).areas(area);
 
         frame.render_widget(
             Paragraph::new(Text::from(
@@ -442,78 +462,67 @@ impl Component for Home {
 
         // Content
 
-        let move_vec = if let Some(Operation::Move { origin, second }) = self.current_operation {
-            Some(Offset {
-                x: second.x as i32 - origin.x as i32,
-                y: second.y as i32 - origin.y as i32,
-            })
-        } else {
-            None
-        };
+        let xs = 0..canvas_area.width;
+        let ys = 0..canvas_area.height;
 
-        for (i, element) in self.canvas.elements.iter().enumerate() {
-            let selected = self.selected_elements.contains(&i);
-            element.draw_to(
-                frame,
-                &canvas_area,
-                selected,
-                if selected {
-                    &self.current_operation
-                } else {
-                    &None
-                },
-            );
+        for (x, y) in xs.flat_map(|x| ys.clone().map(move |y| (x, y))) {
+            if let Some(cell) = self
+                .canvas
+                .buffer
+                .cell((x + self.scroll_offset.x, y + self.scroll_offset.y))
+            {
+                if let Some(frame_cell) = frame.buffer_mut().cell_mut((x + canvas_area.x, y)) {
+                    frame_cell.set_symbol(cell.symbol());
+                    frame_cell.set_fg(cell.fg);
+                }
+            }
         }
 
         // Resize Handles
 
         if self.selected_elements.len() == 1 {
-            let el = &self.canvas.elements[self.selected_elements[0]];
+            let el = &self.canvas.elements[*self.selected_elements.iter().next().unwrap()];
             draw_resize_handles(
                 frame,
-                &self
-                    .current_operation
-                    .map(|o| o.apply_transform(el.area()))
-                    .unwrap_or(*el.area())
-                    .offset(Offset {
-                        x: canvas_area.x as i32,
-                        y: canvas_area.y as i32,
-                    }),
+                &canvas_area,
+                &match &self.current_operation {
+                    Some(o) => o.apply_transform(el.area()),
+                    None => *el.area(),
+                },
+                &self.scroll_offset,
             );
         }
 
-        // Operation
+        // Selection
 
-        if let Some(operation) = &self.current_operation {
-            match operation {
-                Operation::Selection { origin, second } => {
-                    let sel_area = Rect {
-                        x: origin.x.min(second.x),
-                        y: origin.y.min(second.y),
-                        width: origin.x.abs_diff(second.x) + 1,
-                        height: origin.y.abs_diff(second.y) + 1,
-                    };
-
-                    match self.current_tool {
-                        Tool::Cursor => frame.render_widget(
-                            Block::new().style(Style::new().bg(color_scheme::SELECTION)),
-                            sel_area.offset(Offset {
-                                x: canvas_area.x as i32,
-                                y: canvas_area.y as i32,
-                            }),
-                        ),
-                        Tool::Box => frame.render_widget(
-                            Block::bordered().style(Style::new().fg(color_scheme::FOREGROUND)),
-                            sel_area.offset(Offset {
-                                x: canvas_area.x as i32,
-                                y: canvas_area.y as i32,
-                            }),
-                        ),
-                        _ => {}
-                    };
-                }
-                _ => {}
+        if let Some(Operation::Selection { origin, second }) = &self.current_operation {
+            let sel_area = Rect {
+                x: origin.x.min(second.x) - self.scroll_offset.x,
+                y: origin.y.min(second.y) - self.scroll_offset.y,
+                width: origin.x.abs_diff(second.x) + 1,
+                height: origin.y.abs_diff(second.y) + 1,
             }
+            .offset(Offset {
+                x: canvas_area.x as i32,
+                y: canvas_area.y as i32,
+            })
+            .intersection(canvas_area);
+
+            match self.current_tool {
+                Tool::Cursor => frame.render_widget(
+                    Block::new().style(Style::new().bg(color_scheme::SELECTION)),
+                    sel_area,
+                ),
+                Tool::Box => frame.render_widget(
+                    Block::bordered().style(Style::new().fg(color_scheme::FOREGROUND)),
+                    sel_area,
+                ),
+                Tool::Text => frame.render_widget(
+                    Block::bordered().border_style(Style::new().fg(color_scheme::FOREGROUND)),
+                    sel_area,
+                ),
+                _ => {}
+            };
         }
 
         // Toolbox
@@ -542,41 +551,92 @@ impl Component for Home {
             center_horizontal(toolbox_area, 46),
         );
 
+        // Scrollbars
+
+        let style = Style::new()
+            .bg(color_scheme::BACKGROUND)
+            .fg(color_scheme::MUTED);
+
+        let mut scrollbar_state = ScrollbarState::new(
+            self.canvas
+                .buffer
+                .area
+                .height
+                .saturating_sub(canvas_area.height) as usize,
+        )
+        .position(self.scroll_offset.y as usize);
+
+        frame.render_stateful_widget(
+            Scrollbar::new(ScrollbarOrientation::VerticalRight)
+                .track_symbol(None)
+                .begin_symbol(None)
+                .end_symbol(None)
+                .style(style),
+            canvas_area.inner(Margin {
+                vertical: 1,
+                horizontal: 0,
+            }),
+            &mut scrollbar_state,
+        );
+
+        let mut scrollbar_state = ScrollbarState::new(
+            self.canvas
+                .buffer
+                .area
+                .width
+                .saturating_sub(canvas_area.width) as usize,
+        )
+        .position(self.scroll_offset.x as usize);
+
+        frame.render_stateful_widget(
+            Scrollbar::new(ScrollbarOrientation::HorizontalBottom)
+                .thumb_symbol("▄")
+                .track_symbol(None)
+                .begin_symbol(None)
+                .end_symbol(None)
+                .style(style),
+            canvas_area.inner(Margin {
+                vertical: 0,
+                horizontal: 1,
+            }),
+            &mut scrollbar_state,
+        );
+
         // Style Editor
 
         let [position_area, border_area, shadow_area] =
-            Layout::vertical([Length(6), Length(8), Length(6)])
-                .margin(1)
-                .areas(style_area);
+            Layout::vertical([Length(6), Length(8), Length(6)]).areas(style_area);
 
-        frame.render_widget(
-            Block::bordered()
-                .title("Position")
-                .style(Style::new().fg(color_scheme::FOREGROUND))
-                .border_style(Style::default().fg(color_scheme::MUTED)),
-            position_area,
-        );
-        frame.render_widget(
-            Block::bordered()
-                .title("Border")
-                .style(Style::new().fg(color_scheme::FOREGROUND))
-                .border_style(Style::default().fg(color_scheme::MUTED)),
-            border_area,
-        );
-        frame.render_widget(
-            Block::bordered()
-                .title("Shadow")
-                .style(Style::new().fg(color_scheme::FOREGROUND))
-                .border_style(Style::default().fg(color_scheme::MUTED)),
-            shadow_area,
-        );
+        if self.selected_elements.len() == 1 {
+            let el = self.selected_elements.iter().next().unwrap();
+            frame.render_widget(
+                Block::bordered()
+                    .title("Position")
+                    .style(Style::new().fg(color_scheme::FOREGROUND))
+                    .border_style(Style::default().fg(color_scheme::MUTED)),
+                position_area,
+            );
+            frame.render_widget(
+                Block::bordered()
+                    .title("Border")
+                    .style(Style::new().fg(color_scheme::FOREGROUND))
+                    .border_style(Style::default().fg(color_scheme::MUTED)),
+                border_area,
+            );
+            frame.render_widget(
+                Block::bordered()
+                    .title("Shadow")
+                    .style(Style::new().fg(color_scheme::FOREGROUND))
+                    .border_style(Style::default().fg(color_scheme::MUTED)),
+                shadow_area,
+            );
+        }
 
         frame.render_widget(
             List::new(
                 self.canvas
                     .elements
                     .iter()
-                    .rev()
                     .map(|x| format!(" {}", x.name()))
                     .enumerate()
                     .map(|(i, x)| {
@@ -586,11 +646,15 @@ impl Component for Home {
                             Span::raw(x)
                         }
                     })
+                    .rev()
                     .collect::<Vec<_>>(),
             )
             .block(
                 Block::new()
-                    .title(" [e] Elements")
+                    .title(Span::styled(
+                        " Layers",
+                        Style::new().fg(color_scheme::SECONDARY),
+                    ))
                     .style(Style::default().fg(color_scheme::MUTED)),
             ),
             layers_area,
@@ -607,32 +671,27 @@ fn center_horizontal(area: Rect, width: u16) -> Rect {
     area
 }
 
-fn draw_resize_handles(frame: &mut Frame, area: &Rect) {
+fn draw_resize_handles(frame: &mut Frame, canvas_area: &Rect, area: &Rect, offset: &Position) {
     let style = Style::new().fg(color_scheme::SELECTION_FG);
 
-    frame.render_widget(
-        Paragraph::new("▄").style(style),
-        area.offset(Offset { x: -1, y: -1 }),
-    );
-    frame.render_widget(
-        Paragraph::new("▀").style(style),
-        area.offset(Offset {
-            x: -1,
-            y: area.height as i32,
-        }),
-    );
-    frame.render_widget(
-        Paragraph::new("▄").style(style),
-        area.offset(Offset {
-            x: area.width as i32,
-            y: -1,
-        }),
-    );
-    frame.render_widget(
-        Paragraph::new("▀").style(style),
-        area.offset(Offset {
-            x: area.width as i32,
-            y: area.height as i32,
-        }),
-    );
+    [
+        (-1, -1, "▄"),
+        (area.width as i16, -1, "▄"),
+        (-1, area.height as i16, "▀"),
+        (area.width as i16, area.height as i16, "▀"),
+    ]
+    .into_iter()
+    .map(|(x, y, s)| {
+        (
+            area.x
+                .checked_add_signed(x - offset.x as i16 + canvas_area.x as i16),
+            area.y
+                .checked_add_signed(y - offset.y as i16 + canvas_area.y as i16),
+            s,
+        )
+    })
+    .filter_map(|(x, y, s)| x.zip(y).map(Position::from).zip(Some(s)))
+    .filter(|(pos, _)| canvas_area.contains(*pos))
+    .map(|(Position { x, y }, s)| (Rect::new(x, y, 1, 1), Span::styled(s, style)))
+    .for_each(|(rect, s)| frame.render_widget(s, rect));
 }

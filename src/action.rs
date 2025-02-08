@@ -5,6 +5,7 @@ use strum::Display;
 pub enum Action {
     Tick,
     Render,
+    RenderBuffer,
     Resize(u16, u16),
     Suspend,
     Resume,
