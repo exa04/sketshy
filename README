@@ -1,0 +1,128 @@
+   _______  ____ ___  ________  ________  _______  _________  ________ 
+  ╱       ╲╱    ╱   ╲╱        ╲╱        ╲╱       ╲╱     ╱   ╲╱    ╱   ╲
+ ╱       _╱         ╱         ╱        _╱       _╱          ╱         ╱
+╱-       ╱        _╱        _╱╱       ╱╱-       ╱          ╱╲__      ╱ 
+╲_______╱╲____╱___╱╲________╱ ╲______╱ ╲_______╱╲____╱____╱   ╲_____╱
+══════════════════ plaintext charts and drawings from your terminal! ══
+
+  sketshy is a TUI tool for designing "ASCII art", plaintext diagrams
+  and more. It's like if Excalidraw and Vim had a kit that grew up to
+  run a late-90s aesthetic Tumblr blog.
+
+  ┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+  ┃ Layers       │                                                  ┃
+  ┃ Box 1        │           ▄                    ▄                 ┃
+  ┃ Box 2        │            ┌──────────────────┐                  ┃
+  ┃              │            │                  │                  ┃
+  ┃              │            │                  │                  ┃
+  ┃              │            │                  │                  ┃
+  ┃              │            │                  │                  ┃
+  ┃              │            └──────────────────┘                  ┃
+  ┃              │           ▀      │         │   ▀                 ┃
+  ┃              │                  └─────────┘                     ┃
+  ┃              │                                                  ┃
+  ┃              │  ┌Tools───────────────────────────────────────┐  ┃
+  ┃              │  │ [v] Cursor │ [b] Box │ [l] Line │ [i] Text │  ┃
+  ┃              │  └────────────────────────────────────────────┘  ┃
+  ┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛
+
+╱╱    ╱╱╱    ╱╱╱    ╱╱╱    ╱╱╱    ╱╱╱    ╱╱╱    ╱╱╱    ╱╱╱    ╱╱╱    ╱╱
+
+  ██  WARNING
+  ██  This app is in heavy development, very feature-incomplete, even
+  ▄▄  this README is pretty inaccurate. Just FYI :3
+
+╱╱    ╱╱╱    ╱╱╱    ╱╱╱    ╱╱╱    ╱╱╱    ╱╱╱    ╱╱╱    ╱╱╱    ╱╱╱    ╱╱
+
+
+──[ FEATURES ]─────────────────────────────────────────────────────────
+
+  ┌─────────────────────────────┐     ┌─────────────────────────────┐
+  │ Layers        ┆             │     │      ▄               ▄      │
+  │ Box 1         ┆             │     │       ┌─────────────┐       │
+  │ Box 2         ┆   █████     │     │       │             │       │
+  │ T "Layer Exam…┆   █████▒▒   │     │       │             │       │
+  │               ┆     ▒▒▒▒▒   │     │       │             │       │
+  │               ┆             │     │       └─────────────┘       │
+  │               ┆             │     │      ▀               ▀      │
+  └─────────────────────────────┘     └─────────────────────────────┘
+
+  Layers                              Non-destructive Editing
+
+  Each element lives on its own       You can adjust everything about
+  layer. You can bring things to      your elements after creating
+  the front, or push them into        them. sketshy even gives you
+  the background.                     Photoshop-esque resize handles!
+
+
+──[ HOW TO USE ]───────────────────────────────────────────────────────
+
+  To add elements, such as a box or a text element, first switch to
+  the appropriate tool. Then, drag anywhere on the canvas to add a
+  new element. You can select elements by clicking on them, or
+  dragging over them with the mouse. Move them by dragging them
+  around or resize them by dragging their resize handles.
+
+
+──[ KEYMAP ]───────────────────────────────────────────────────────────
+
+  sketshy's keymap is inspired by Vim, as well as popular design
+  tools. You will, in the near future, be able to define your own
+  keymap using a config file.
+
+  Navigation
+  
+    [w] Switch Focus      [:] Command palette   [?] Show Keybinds
+
+  Canvas
+  
+    [v] Cursor tool       [%] Select all
+    [b] Box tool          [x] Delete
+    [l] Line tool         [y] Copy
+    [i] Text tool         [p] Paste
+
+  Layers List
+
+    [↑] Go up             [%] Select all        [space] Select hovered
+    [↓] Go down           [x] Delete                    element
+    [u] Move layer/s up   [y] Copy
+    [d] Move layer/s down [p] Paste
+
+
+──[ ROADMAP ]──────────────────────────────────────────────────────────
+
+  Most of this roadmap is the "basic" feature set. After everything
+  here has been implemented, silly features such as FIGlet / "ASCII
+  art" text and image imports might come - who knows!
+  
+  [x] Cursor tool
+  [x] Box tool
+  [ ] Line tool
+  [ ] Text tool
+  [ ] Paintbrush tool
+
+  [ ] Scrolling
+
+  [ ] Grouping
+  [ ] Flattening
+
+  [ ] Command palette
+      [ ] New, Save, Load, Quit
+      [ ] Plaintext export
+      [ ] Plaintext import
+
+  [ ] Setup wizard
+
+  [x] Layers panel
+      [x] Element list
+      [ ] Selection
+      [ ] Moving
+
+  [ ] Styling panel
+      [ ] Translation
+      [ ] Box styling: Border, Shadow
+      [ ] Text styling: Border, Shadow
+      [ ] Line styling: Arrowheads, Thickness
+
+  [ ] Config
+      [ ] Theming
