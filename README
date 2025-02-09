@@ -13,10 +13,10 @@
   ┃ Layers       │                                                  ┃
   ┃ Box 1        │           ▄                    ▄                 ┃
   ┃ Box 2        │            ┌──────────────────┐                  ┃
-  ┃              │            │                  │                  ┃
-  ┃              │            │                  │                  ┃
-  ┃              │            │                  │                  ┃
-  ┃              │            │                  │                  ┃
+  ┃ Text "sketshy│            │ sketshy:         │                  ┃
+  ┃              │            │ plaintext charts │                  ┃
+  ┃              │            │ and drawings     │                  ┃
+  ┃              │            │ from your terminal!                 ┃
   ┃              │            └──────────────────┘                  ┃
   ┃              │           ▀      │         │   ▀                 ┃
   ┃              │                  └─────────┘                     ┃

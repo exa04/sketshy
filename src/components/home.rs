@@ -608,7 +608,6 @@ impl Component for Home {
             Layout::vertical([Length(6), Length(8), Length(6)]).areas(style_area);
 
         if self.selected_elements.len() == 1 {
-            let el = self.selected_elements.iter().next().unwrap();
             frame.render_widget(
                 Block::bordered()
                     .title("Position")
