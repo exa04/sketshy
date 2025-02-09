@@ -91,42 +91,68 @@
 
 ──[ ROADMAP ]──────────────────────────────────────────────────────────
 
-  Most of this roadmap is the "basic" feature set. After everything
-  here has been implemented, silly features such as FIGlet / "ASCII
-  art" text and image imports might come - who knows!
-  
-  [x] Cursor tool
-  [x] Box tool
-  [ ] Text tool
-  [ ] Line tool
-  [ ] Paint tool
-  [ ] Frame tool
+  0.1.0
 
-  [x] Scrolling
-  [x] Ruler and Guides
+      Tools
+          [x] Cursor tool
+          [x] Box tool
+          [x] Text tool
+          [ ] Line tool
 
-  [ ] Grouping
-  [ ] Flattening
+      [x] Scrolling
 
-  [ ] Command palette
-      [ ] New, Save, Load, Quit
-      [ ] Plaintext export - export all, selected, frame etc
-      [ ] Plaintext import
 
-  [ ] Setup wizard
+      [ ] Command palette
+          [ ] Quit
+          [ ] Export all
 
-  [x] Layers panel
-      [x] Element list
-      [ ] Selection
-      [ ] Moving
+      [x] Layers panel
+          [x] Element list
+          [ ] Selection
+          [ ] Moving
 
-  [ ] Styling panel
-      [ ] Translation
-      [ ] Box styling: Border, Shadow
-      [ ] Text styling: Border, Shadow
-      [ ] Line styling: Arrowheads, Thickness
 
-  [ ] Config
-      [ ] Keymap
-      [ ] Theming
+  0.2.0
 
+      Tools
+          [ ] Paint tool
+          [ ] Circle tool
+
+      [x] Ruler and guides
+      
+      [ ] Clipboard
+
+      Layers panel
+          [ ] Grouping
+          [ ] Flattening
+
+      Commands
+          [ ] New
+          [ ] Save
+          [ ] Load
+          [ ] Export selected
+          [ ] Plaintext import
+
+      [ ] Setup wizard
+
+      [ ] Styling panel
+          [ ] Style panel navigation
+          [ ] Translation
+          [ ] Box styling: Border, Shadow
+          [ ] Text styling: Border, Shadow
+          [ ] Line styling: Arrowheads, Thickness
+
+
+  0.3.0
+
+      Tools
+          [ ] Big Text: "Word Art"-esque UX for FIGlet-esque fonts
+              with variable size... something like that
+
+      [ ] Greeter
+
+      [ ] Context menu
+
+      [ ] Config
+          [ ] Keymap
+          [ ] Theming

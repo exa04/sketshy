@@ -67,7 +67,6 @@ impl Element {
 
                 Paragraph::new(content.as_str())
                     .style(style)
-                    .wrap(Wrap { trim: false })
                     .render(area, buffer);
             }
         }

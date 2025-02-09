@@ -1,4 +1,5 @@
 use ratatui::layout::{Offset, Position, Rect};
+use tui_textarea::TextArea;
 
 #[derive(Clone)]
 pub enum Operation {
@@ -16,7 +17,7 @@ pub enum Operation {
         second: Position,
     },
     EditText {
-        position: u16,
+        textarea: TextArea<'static>,
     },
 }
 
@@ -47,8 +48,8 @@ impl Operation {
                     y: (area.y as i32
                         + (second.y as i32 - origin.y as i32).min(area.height as i32 - 2))
                         as u16,
-                    width: (area.width as i32 - (second.x as i32 - origin.x as i32)).max(2) as u16,
-                    height: (area.height as i32 - (second.y as i32 - origin.y as i32)).max(2)
+                    width: (area.width as i32 - (second.x as i32 - origin.x as i32)).max(1) as u16,
+                    height: (area.height as i32 - (second.y as i32 - origin.y as i32)).max(1)
                         as u16,
                 },
                 Direction::TopRight => Rect {
@@ -56,8 +57,8 @@ impl Operation {
                     y: (area.y as i32
                         + (second.y as i32 - origin.y as i32).min(area.height as i32 - 2))
                         as u16,
-                    width: (area.width as i32 + (second.x as i32 - origin.x as i32)).max(2) as u16,
-                    height: (area.height as i32 - (second.y as i32 - origin.y as i32)).max(2)
+                    width: (area.width as i32 + (second.x as i32 - origin.x as i32)).max(1) as u16,
+                    height: (area.height as i32 - (second.y as i32 - origin.y as i32)).max(1)
                         as u16,
                 },
                 Direction::BottomLeft => Rect {
@@ -65,15 +66,15 @@ impl Operation {
                         + (second.x as i32 - origin.x as i32).min(area.width as i32 - 2))
                         as u16,
                     y: area.y,
-                    width: (area.width as i32 - (second.x as i32 - origin.x as i32)).max(2) as u16,
-                    height: (area.height as i32 + (second.y as i32 - origin.y as i32)).max(2)
+                    width: (area.width as i32 - (second.x as i32 - origin.x as i32)).max(1) as u16,
+                    height: (area.height as i32 + (second.y as i32 - origin.y as i32)).max(1)
                         as u16,
                 },
                 Direction::BottomRight => Rect {
                     x: area.x,
                     y: area.y,
-                    width: (area.width as i32 + (second.x as i32 - origin.x as i32)).max(2) as u16,
-                    height: (area.height as i32 + (second.y as i32 - origin.y as i32)).max(2)
+                    width: (area.width as i32 + (second.x as i32 - origin.x as i32)).max(1) as u16,
+                    height: (area.height as i32 + (second.y as i32 - origin.y as i32)).max(1)
                         as u16,
                 },
             },

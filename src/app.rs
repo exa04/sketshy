@@ -3,7 +3,7 @@ use crossterm::event::KeyEvent;
 use ratatui::prelude::Rect;
 use serde::{Deserialize, Serialize};
 use tokio::sync::mpsc;
-use tracing::{debug, info};
+use tracing::debug;
 
 use crate::{
     action::Action,
@@ -113,23 +113,23 @@ impl App {
         let Some(keymap) = self.config.keybindings.get(&self.mode) else {
             return Ok(());
         };
-        match keymap.get(&vec![key]) {
-            Some(action) => {
-                info!("Got action: {action:?}");
-                action_tx.send(action.clone())?;
-            }
-            _ => {
-                // If the key was not handled as a single key action,
-                // then consider it for multi-key combinations.
-                self.last_tick_key_events.push(key);
+        // match keymap.get(&vec![key]) {
+        //     Some(action) => {
+        //         info!("Got action: {action:?}");
+        //         action_tx.send(action.clone())?;
+        //     }
+        //     _ => {
+        //         // If the key was not handled as a single key action,
+        //         // then consider it for multi-key combinations.
+        //         self.last_tick_key_events.push(key);
 
-                // Check for multi-key combinations
-                if let Some(action) = keymap.get(&self.last_tick_key_events) {
-                    info!("Got action: {action:?}");
-                    action_tx.send(action.clone())?;
-                }
-            }
-        }
+        //         // Check for multi-key combinations
+        //         if let Some(action) = keymap.get(&self.last_tick_key_events) {
+        //             info!("Got action: {action:?}");
+        //             action_tx.send(action.clone())?;
+        //         }
+        //     }
+        // }
         Ok(())
     }
 
@@ -183,6 +183,7 @@ pub mod color_scheme {
     use ratatui::style::Color;
 
     pub const BACKGROUND: Color = Color::Rgb(17, 17, 27);
+    pub const ELEVATED: Color = Color::Rgb(30, 30, 46);
     pub const CHECKERS: Color = Color::Rgb(24, 24, 37);
     pub const SELECTION: Color = Color::Rgb(49, 50, 68);
 
