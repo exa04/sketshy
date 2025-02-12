@@ -7,6 +7,7 @@ use crate::app::App;
 mod action;
 mod app;
 mod cli;
+mod commands;
 mod components;
 mod config;
 mod drawing;

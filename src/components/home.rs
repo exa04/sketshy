@@ -1,9 +1,10 @@
-use std::{collections::HashSet, ops::Not};
+use std::{collections::HashSet, fs::File, io::Write, ops::Not, path::PathBuf};
 
 use color_eyre::Result;
 use crossterm::event::{KeyEvent, KeyModifiers, MouseButton, MouseEvent, MouseEventKind};
 use layout::{Flex, Offset};
 use ratatui::{prelude::*, widgets::*};
+use serde::{Deserialize, Serialize};
 use tokio::sync::mpsc::UnboundedSender;
 use tui_textarea::TextArea;
 
@@ -15,8 +16,8 @@ use crate::{
     drawing::{Direction, DrawingCanvas, Element, Operation},
 };
 
-#[derive(PartialEq, Eq)]
-enum Tool {
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub enum Tool {
     Cursor,
     Box,
     Line,
@@ -80,126 +81,10 @@ impl Component for Home {
     }
 
     fn handle_key_event(&mut self, key: KeyEvent) -> Result<Option<Action>> {
-        use crossterm::event::{KeyCode::*, KeyModifiers};
-
         if let Some(Operation::EditText { textarea }) = &mut self.current_operation {
             textarea.input(key);
-
-            return if let KeyEvent { code: Esc, .. } = key {
-                if let Some(Element::Text { content, .. }) = self
-                    .selected_elements
-                    .iter()
-                    .next()
-                    .and_then(|i| self.canvas.elements.get_mut(*i))
-                {
-                    *content = textarea.lines().join("\n");
-                }
-                self.current_operation = None;
-                Ok(Some(Action::RenderBuffer))
-            } else {
-                Ok(None)
-            };
         }
-
-        match key {
-            KeyEvent {
-                code: Char('q'), ..
-            } => Ok(Some(Action::Quit)),
-            KeyEvent {
-                code: Char('v'), ..
-            } => {
-                self.update_tool(Tool::Cursor);
-                Ok(Some(Action::RenderBuffer))
-            }
-            KeyEvent {
-                code: Char('b'), ..
-            } => {
-                self.update_tool(Tool::Box);
-                Ok(Some(Action::RenderBuffer))
-            }
-            KeyEvent {
-                code: Char('l'), ..
-            } => {
-                self.update_tool(Tool::Line);
-                Ok(Some(Action::RenderBuffer))
-            }
-            KeyEvent {
-                code: Char('i'), ..
-            } => {
-                self.update_tool(Tool::Text);
-                Ok(Some(Action::RenderBuffer))
-            }
-            KeyEvent {
-                code: Char('%'), ..
-            }
-            | KeyEvent {
-                code: Char('a'),
-                modifiers: KeyModifiers::CONTROL,
-                ..
-            } => {
-                self.update_tool(Tool::Cursor);
-                self.selected_elements =
-                    (0..self.canvas.elements.len()).collect::<HashSet<usize>>();
-                Ok(Some(Action::RenderBuffer))
-            }
-            KeyEvent {
-                code: Char('d'), ..
-            }
-            | KeyEvent { code: Delete, .. } => {
-                self.canvas.elements = self
-                    .canvas
-                    .elements
-                    .iter()
-                    .enumerate()
-                    .filter_map(|(i, el)| {
-                        self.selected_elements
-                            .contains(&i)
-                            .not()
-                            .then_some(el.clone())
-                    })
-                    .collect::<Vec<_>>()
-                    .into();
-                self.selected_elements.clear();
-                Ok(Some(Action::RenderBuffer))
-            }
-            KeyEvent {
-                code: Up,
-                modifiers: _,
-                kind: _,
-                state: _,
-            } => {
-                self.scroll_offset.y = self.scroll_offset.y.saturating_sub(SCROLL_STEP);
-                Ok(Some(Action::RenderBuffer))
-            }
-            KeyEvent {
-                code: Down,
-                modifiers: _,
-                kind: _,
-                state: _,
-            } => {
-                self.scroll_offset.y += SCROLL_STEP;
-                Ok(Some(Action::RenderBuffer))
-            }
-            KeyEvent {
-                code: Left,
-                modifiers: _,
-                kind: _,
-                state: _,
-            } => {
-                self.scroll_offset.x = self.scroll_offset.x.saturating_sub(SCROLL_STEP * 2);
-                Ok(Some(Action::RenderBuffer))
-            }
-            KeyEvent {
-                code: Right,
-                modifiers: _,
-                kind: _,
-                state: _,
-            } => {
-                self.scroll_offset.x += SCROLL_STEP * 2;
-                Ok(Some(Action::RenderBuffer))
-            }
-            _ => Ok(None),
-        }
+        Ok(None)
     }
 
     fn handle_mouse_event(&mut self, mouse: MouseEvent) -> Result<Option<Action>> {
@@ -295,10 +180,11 @@ impl Component for Home {
                             {
                                 self.selected_elements.insert(x);
                             }
+
                             Ok(Some(Action::RenderBuffer))
                         }
                     }
-                    Tool::Box => {
+                    Tool::Box | Tool::Line => {
                         self.selected_elements.clear();
                         self.current_operation = Some(Operation::Selection {
                             origin: (column, row).into(),
@@ -307,24 +193,8 @@ impl Component for Home {
                         Ok(None)
                     }
                     Tool::Text => {
-                        if let Some(Operation::EditText { textarea }) = &self.current_operation {
-                            if textarea.lines().len() == 1 && textarea.lines()[0].is_empty() {
-                                self.selected_elements
-                                    .iter()
-                                    .next()
-                                    .and_then(|i| self.canvas.elements.remove(*i));
-                                self.selected_elements.clear();
-                            } else if let Some(Element::Text { content, .. }) = self
-                                .selected_elements
-                                .iter()
-                                .next()
-                                .and_then(|i| self.canvas.elements.get_mut(*i))
-                            {
-                                *content = textarea.lines().join("\n");
-                            }
-                            self.current_operation = None;
-                            self.current_tool = Tool::Cursor;
-                            Ok(Some(Action::RenderBuffer))
+                        if let Some(Operation::EditText { .. }) = &self.current_operation {
+                            Ok(Some(Action::CommitText))
                         } else {
                             self.selected_elements.clear();
                             self.current_operation = Some(Operation::Selection {
@@ -334,14 +204,13 @@ impl Component for Home {
                             Ok(None)
                         }
                     }
-                    _ => Ok(None),
                 }
             }
             MouseEventKind::Drag(MouseButton::Left) => {
                 let row = row + self.scroll_offset.y;
                 let column = column - LIST_WIDTH + self.scroll_offset.x;
                 match self.current_tool {
-                    Tool::Box | Tool::Text => {
+                    Tool::Box | Tool::Text | Tool::Line => {
                         if let Some(Operation::Selection { origin: _, second }) =
                             &mut self.current_operation
                         {
@@ -384,7 +253,6 @@ impl Component for Home {
                         }
                         _ => Ok(None),
                     },
-                    _ => Ok(None),
                 }
             }
             MouseEventKind::Up(MouseButton::Left) => match self.current_tool {
@@ -407,6 +275,27 @@ impl Component for Home {
                     self.current_operation = None;
                     Ok(Some(Action::RenderBuffer))
                 }
+                Tool::Line => {
+                    if let Some(Operation::Selection { origin, second }) = self.current_operation {
+                        if origin != second {
+                            self.canvas.elements.push_back(Element::Line {
+                                from: (origin.x > second.x, origin.y < second.y),
+                                to: (second.x > origin.x, second.y < origin.y),
+                                area: Rect {
+                                    x: origin.x.min(second.x),
+                                    y: origin.y.min(second.y),
+                                    width: origin.x.abs_diff(second.x) + 1,
+                                    height: origin.y.abs_diff(second.y) + 1,
+                                },
+                            });
+                            self.reset_tool();
+                            self.selected_elements
+                                .insert(self.canvas.elements.len() - 1);
+                        }
+                    }
+                    self.current_operation = None;
+                    Ok(Some(Action::RenderBuffer))
+                }
                 Tool::Text => {
                     if let Some(Operation::Selection { origin, second }) = self.current_operation {
                         let area = Rect {
@@ -421,6 +310,7 @@ impl Component for Home {
                             .elements
                             .iter()
                             .enumerate()
+                            .filter(|(_, el)| matches!(el, Element::Text { .. }))
                             .find(|(_, el)| {
                                 el.area().contains(Position {
                                     x: area.x,
@@ -433,14 +323,14 @@ impl Component for Home {
                             self.selected_elements.insert(i);
                             let mut textarea = TextArea::from(content.split('\n'));
                             textarea.set_block(
-                                Block::new().style(Style::new().bg(color_scheme::ELEVATED)),
+                                Block::new().style(Style::new().bg(color_scheme::BG_ELEVATED)),
                             );
                             textarea.move_cursor(tui_textarea::CursorMove::Jump(
                                 origin.y - area.y,
                                 origin.x - area.x,
                             ));
                             self.current_operation = Some(Operation::EditText { textarea });
-                            Ok(Some(Action::RenderBuffer))
+                            Ok(Some(Action::EditText))
                         } else if area.width > 1 && area.height >= 1 {
                             self.canvas.elements.push_back(Element::Text {
                                 area,
@@ -450,10 +340,10 @@ impl Component for Home {
                                 .insert(self.canvas.elements.len() - 1);
                             let mut textarea = TextArea::default();
                             textarea.set_block(
-                                Block::new().style(Style::new().bg(color_scheme::ELEVATED)),
+                                Block::new().style(Style::new().bg(color_scheme::BG_ELEVATED)),
                             );
                             self.current_operation = Some(Operation::EditText { textarea });
-                            Ok(Some(Action::RenderBuffer))
+                            Ok(Some(Action::EditText))
                         } else {
                             self.reset_tool();
                             Ok(Some(Action::RenderBuffer))
@@ -477,48 +367,109 @@ impl Component for Home {
                 }
                 _ => Ok(None),
             },
-            MouseEventKind::ScrollDown => {
-                self.scroll_offset.y += SCROLL_STEP;
-                Ok(Some(Action::RenderBuffer))
-            }
-            MouseEventKind::ScrollUp => {
-                self.scroll_offset.y = self.scroll_offset.y.saturating_sub(SCROLL_STEP);
-                Ok(Some(Action::RenderBuffer))
-            }
-            MouseEventKind::ScrollRight => {
-                self.scroll_offset.x += SCROLL_STEP;
-                Ok(Some(Action::RenderBuffer))
-            }
-            MouseEventKind::ScrollLeft => {
-                self.scroll_offset.x = self.scroll_offset.x.saturating_sub(SCROLL_STEP);
-                Ok(Some(Action::RenderBuffer))
-            }
+            MouseEventKind::ScrollDown => Ok(Some(Action::ScrollDown)),
+            MouseEventKind::ScrollUp => Ok(Some(Action::ScrollUp)),
+            MouseEventKind::ScrollRight => Ok(Some(Action::ScrollRight)),
+            MouseEventKind::ScrollLeft => Ok(Some(Action::ScrollLeft)),
             _ => Ok(None),
         }
     }
 
     fn update(&mut self, action: Action) -> Result<Option<Action>> {
         match action {
-            Action::Tick => {
-                // add any logic here that should run on every tick
-            }
-            Action::Render => {
-                // add any logic here that should run on every render
-            }
             Action::RenderBuffer => {
                 self.canvas
                     .render(&self.selected_elements, &self.current_operation);
+                Ok(None)
             }
-            _ => {}
+            Action::SwitchTool(tool) => {
+                if tool != self.current_tool {
+                    if self.current_operation.is_some() {
+                        self.current_operation = None;
+                    }
+
+                    self.current_tool = tool;
+                }
+                Ok(None)
+            }
+            Action::EditText => Ok(Some(Action::RenderBuffer)),
+            Action::CommitText => {
+                if let Some(Element::Text { content, .. }) = self
+                    .selected_elements
+                    .iter()
+                    .next()
+                    .and_then(|i| self.canvas.elements.get_mut(*i))
+                {
+                    *content =
+                        if let Some(Operation::EditText { textarea }) = &self.current_operation {
+                            textarea.lines().join("\n")
+                        } else {
+                            "".into()
+                        };
+                }
+                self.current_operation = None;
+                Ok(Some(Action::RenderBuffer))
+            }
+            Action::SelectAll => {
+                self.update_tool(Tool::Cursor);
+                self.selected_elements =
+                    (0..self.canvas.elements.len()).collect::<HashSet<usize>>();
+                Ok(Some(Action::RenderBuffer))
+            }
+            Action::SelectNone => {
+                self.selected_elements.clear();
+                Ok(Some(Action::RenderBuffer))
+            }
+            Action::Delete => {
+                self.canvas.elements = self
+                    .canvas
+                    .elements
+                    .iter()
+                    .enumerate()
+                    .filter_map(|(i, el)| {
+                        self.selected_elements
+                            .contains(&i)
+                            .not()
+                            .then_some(el.clone())
+                    })
+                    .collect::<Vec<_>>()
+                    .into();
+                Ok(Some(Action::SelectNone))
+            }
+            Action::OpenCommandPalette => {
+                self.selected_elements.clear();
+                Ok(None)
+            }
+            Action::ScrollUp => {
+                self.scroll_offset.y = self.scroll_offset.y.saturating_sub(SCROLL_STEP);
+                Ok(Some(Action::RenderBuffer))
+            }
+            Action::ScrollDown => {
+                self.scroll_offset.y += SCROLL_STEP;
+                Ok(Some(Action::RenderBuffer))
+            }
+            Action::ScrollLeft => {
+                self.scroll_offset.x = self.scroll_offset.x.saturating_sub(SCROLL_STEP * 2);
+                Ok(Some(Action::RenderBuffer))
+            }
+            Action::ScrollRight => {
+                self.scroll_offset.x += SCROLL_STEP * 2;
+                Ok(Some(Action::RenderBuffer))
+            }
+            Action::Export(path) => {
+                let mut file = File::create(PathBuf::from(path))?;
+                file.write_all(&self.canvas.to_string())?;
+                Ok(None)
+            }
+            _ => Ok(None),
         }
-        Ok(None)
     }
 
     fn draw(&mut self, frame: &mut Frame, area: Rect) -> Result<()> {
         use Constraint::{Fill, Length};
 
         frame.render_widget(
-            Block::new().style(Style::new().bg(color_scheme::BACKGROUND)),
+            Block::new().style(Style::new().bg(color_scheme::BG_BASE)),
             area,
         );
 
@@ -536,7 +487,7 @@ impl Component for Home {
                                     if x % 2 == y {
                                         Span::styled(
                                             "  ".to_owned(),
-                                            Style::new().bg(color_scheme::CHECKERS),
+                                            Style::new().bg(color_scheme::BG_CHECKERS),
                                         )
                                     } else {
                                         Span::raw("  ".to_owned())
@@ -547,7 +498,7 @@ impl Component for Home {
                     })
                     .collect::<Vec<_>>(),
             ))
-            .style(Style::new().fg(color_scheme::SECONDARY)),
+            .style(Style::new().fg(color_scheme::FG_SECONDARY)),
             canvas_area,
         );
 
@@ -608,17 +559,17 @@ impl Component for Home {
 
                 match self.current_tool {
                     Tool::Cursor => frame.render_widget(
-                        Block::new().style(Style::new().bg(color_scheme::SELECTION)),
+                        Block::new().style(Style::new().bg(color_scheme::BG_SELECTION)),
                         sel_area,
                     ),
                     Tool::Box => frame.render_widget(
-                        Block::bordered().style(Style::new().fg(color_scheme::FOREGROUND)),
+                        Block::bordered().style(Style::new().fg(color_scheme::FG_BASE)),
                         sel_area,
                     ),
                     Tool::Text => {
                         frame.render_widget(Clear, sel_area);
                         frame.render_widget(
-                            Block::new().style(Style::new().bg(color_scheme::ELEVATED)),
+                            Block::new().style(Style::new().bg(color_scheme::BG_ELEVATED)),
                             sel_area,
                         )
                     }
@@ -651,16 +602,16 @@ impl Component for Home {
         let [_, toolbox_area] = Layout::vertical([Fill(1), Length(3)]).areas(canvas_area);
 
         frame.render_widget(
-            Tabs::new(vec!["[v] Cursor", "[b] Box", "[i] Text", "[l] Line"])
-                .style(Style::new().bg(color_scheme::BACKGROUND))
+            Tabs::new(vec!["[v] Cursor", "[b] Box", "[t] Text", "[l] Line"])
+                .style(Style::new().bg(color_scheme::BG_BASE))
                 .block(
                     Block::bordered()
                         .title("Tools")
-                        .style(Style::default().fg(color_scheme::MUTED)),
+                        .style(Style::default().fg(color_scheme::FG_MUTED)),
                 )
                 .highlight_style(
                     Style::default()
-                        .fg(color_scheme::FOREGROUND)
+                        .fg(color_scheme::FG_BASE)
                         .add_modifier(Modifier::BOLD),
                 )
                 .select(match self.current_tool {
@@ -675,8 +626,8 @@ impl Component for Home {
         // Scrollbars
 
         let style = Style::new()
-            .bg(color_scheme::BACKGROUND)
-            .fg(color_scheme::MUTED);
+            .bg(color_scheme::BG_BASE)
+            .fg(color_scheme::FG_MUTED);
 
         let mut scrollbar_state = ScrollbarState::new(
             self.canvas
@@ -732,22 +683,22 @@ impl Component for Home {
             frame.render_widget(
                 Block::bordered()
                     .title("Position")
-                    .style(Style::new().fg(color_scheme::FOREGROUND))
-                    .border_style(Style::default().fg(color_scheme::MUTED)),
+                    .style(Style::new().fg(color_scheme::FG_BASE))
+                    .border_style(Style::default().fg(color_scheme::FG_MUTED)),
                 position_area,
             );
             frame.render_widget(
                 Block::bordered()
                     .title("Border")
-                    .style(Style::new().fg(color_scheme::FOREGROUND))
-                    .border_style(Style::default().fg(color_scheme::MUTED)),
+                    .style(Style::new().fg(color_scheme::FG_BASE))
+                    .border_style(Style::default().fg(color_scheme::FG_MUTED)),
                 border_area,
             );
             frame.render_widget(
                 Block::bordered()
                     .title("Shadow")
-                    .style(Style::new().fg(color_scheme::FOREGROUND))
-                    .border_style(Style::default().fg(color_scheme::MUTED)),
+                    .style(Style::new().fg(color_scheme::FG_BASE))
+                    .border_style(Style::default().fg(color_scheme::FG_MUTED)),
                 shadow_area,
             );
         }
@@ -761,7 +712,7 @@ impl Component for Home {
                     .enumerate()
                     .map(|(i, x)| {
                         if self.selected_elements.contains(&i) {
-                            x.fg(color_scheme::SELECTION_FG)
+                            x.fg(color_scheme::FG_SELECTION)
                         } else {
                             Span::raw(x)
                         }
@@ -773,9 +724,9 @@ impl Component for Home {
                 Block::new()
                     .title(Span::styled(
                         " Layers",
-                        Style::new().fg(color_scheme::SECONDARY),
+                        Style::new().fg(color_scheme::FG_SECONDARY),
                     ))
-                    .style(Style::default().fg(color_scheme::MUTED)),
+                    .style(Style::default().fg(color_scheme::FG_MUTED)),
             ),
             layers_area,
         );
@@ -792,7 +743,7 @@ fn center_horizontal(area: Rect, width: u16) -> Rect {
 }
 
 fn draw_resize_handles(frame: &mut Frame, canvas_area: &Rect, area: &Rect, offset: &Position) {
-    let style = Style::new().fg(color_scheme::SELECTION_FG);
+    let style = Style::new().fg(color_scheme::FG_SELECTION);
 
     [
         (-1, -1, "▄"),

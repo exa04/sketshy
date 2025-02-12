@@ -4,7 +4,27 @@
       "<q>": "Quit", // Quit the application
       "<Ctrl-d>": "Quit", // Another way to quit
       "<Ctrl-c>": "Quit", // Yet another way to quit
-      "<Ctrl-z>": "Suspend" // Suspend the application
+      "<Ctrl-z>": "Suspend", // Suspend the application
+      "<Left>": "ScrollLeft",
+      "<Right>": "ScrollRight",
+      "<Up>": "ScrollUp",
+      "<Down>": "ScrollDown",
+      "<v>": {"SwitchTool": "Cursor"},
+      "<b>": {"SwitchTool": "Box"},
+      "<l>": {"SwitchTool": "Line"},
+      "<t>": {"SwitchTool": "Text"},
+      "<a>": "SelectAll",
+      "<Esc>": "SelectNone",
+      "<d>": "Delete",
+      "<?>": "Help",
+      "<:>": "OpenCommandPalette"
+    },
+    "EditingText": {
+      "<Esc>": "CommitText",
+      "<Ctrl-Enter>": "CommitText",
+      "<Ctrl-d>": "Quit", // Another way to quit
+      "<Ctrl-c>": "Quit", // Yet another way to quit
+      "<Ctrl-z>": "Suspend", // Suspend the application
     },
   }
 }

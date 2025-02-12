@@ -5,6 +5,8 @@
 ╲_______╱╲____╱___╱╲________╱ ╲______╱ ╲_______╱╲____╱____╱   ╲_____╱
 ══════════════════ plaintext charts and drawings from your terminal! ══
 
+  [ version | 0.0.0 ]  [ rust ]
+
   sketshy is a TUI tool for designing "ASCII art", plaintext diagrams
   and more. It's like if Excalidraw and Vim had a kid that grew up to
   run a late-90s aesthetic Tumblr blog.
@@ -22,7 +24,7 @@
   ┃              │                  └─────────┘                     ┃
   ┃              │                                                  ┃
   ┃              │  ┌Tools───────────────────────────────────────┐  ┃
-  ┃              │  │ [v] Cursor │ [b] Box │ [l] Line │ [i] Text │  ┃
+  ┃              │  │ [v] Cursor │ [b] Box │ [i] Text │ [l] Line │  ┃
   ┃              │  └────────────────────────────────────────────┘  ┃
   ┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛
 
@@ -77,19 +79,15 @@
   Canvas
   
     [v] Cursor tool       [%] Select all           [↑]
-    [b] Box tool          [x] Delete            [←][↓][→] Move around
+    [b] Box tool          [d] Delete            [←][↓][→] Move around
     [l] Line tool         [y] Copy
-    [i] Text tool         [p] Paste
-
-  Layers List
-
-    [↑] Go up             [%] Select all        [space] Select hovered
-    [↓] Go down           [x] Delete                    element
-    [u] Move layer/s up   [y] Copy
-    [d] Move layer/s down [p] Paste
+    [t] Text tool         [p] Paste
 
 
-──[ ROADMAP ]──────────────────────────────────────────────────────────
+──[ TO-DO ]────────────────────────────────────────────────────────────
+
+  Move over, Jira :P
+
 
   0.1.0
 
@@ -101,15 +99,15 @@
 
       [x] Scrolling
 
-
-      [ ] Command palette
-          [ ] Quit
-          [ ] Export all
+      [x] Command palette
+          [x] Quit
+          [x] Export to unicode txt file
 
       [x] Layers panel
           [x] Element list
-          [ ] Selection
-          [ ] Moving
+
+      [x] Config
+          [x] Keymap
 
 
   0.2.0
@@ -118,13 +116,10 @@
           [ ] Paint tool
           [ ] Circle tool
 
-      [x] Ruler and guides
+      [ ] Ctrl-drag for even scaling
+      [ ] Ruler and guides
       
       [ ] Clipboard
-
-      Layers panel
-          [ ] Grouping
-          [ ] Flattening
 
       Commands
           [ ] New
@@ -133,7 +128,25 @@
           [ ] Export selected
           [ ] Plaintext import
 
-      [ ] Setup wizard
+
+  0.3.0
+
+      Layers panel
+          [ ] Selection
+          [ ] Moving
+	      [ ] Navigation
+          [ ] Grouping
+          [ ] Flattening
+
+	  [ ] "Show keybinds" by pressing [?] or sth
+
+      [ ] Undo / Redo
+
+      Config
+          [ ] Theming
+
+
+  0.4.0
 
       [ ] Styling panel
           [ ] Style panel navigation
@@ -142,17 +155,17 @@
           [ ] Text styling: Border, Shadow
           [ ] Line styling: Arrowheads, Thickness
 
-
-  0.3.0
-
-      Tools
-          [ ] Big Text: "Word Art"-esque UX for FIGlet-esque fonts
-              with variable size... something like that
-
-      [ ] Greeter
-
       [ ] Context menu
 
-      [ ] Config
-          [ ] Keymap
-          [ ] Theming
+
+  Backlog
+
+	  Tools
+	      [ ] Big Text: "Word Art"-esque UX for FIGlet-esque fonts
+	          with variable size... something like that
+
+	  Commands
+	      [ ] Export to ASCII
+
+	  [ ] Menu bar
+

@@ -47,4 +47,21 @@ impl DrawingCanvas {
             );
         }
     }
+    pub fn to_string(&self) -> Vec<u8> {
+        let mut out_string = String::with_capacity(self.buffer.area().area() as usize);
+
+        for y in 0..self.buffer.area.height {
+            for x in 0..self.buffer.area.width {
+                out_string.push(
+                    self.buffer
+                        .cell((x, y))
+                        .and_then(|c| c.symbol().chars().nth(0))
+                        .unwrap_or_default(),
+                );
+            }
+            out_string.push('\n');
+        }
+
+        out_string.as_bytes().to_vec()
+    }
 }
