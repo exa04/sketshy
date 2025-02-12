@@ -31,8 +31,8 @@
 ╱╱    ╱╱╱    ╱╱╱    ╱╱╱    ╱╱╱    ╱╱╱    ╱╱╱    ╱╱╱    ╱╱╱    ╱╱╱    ╱╱
 
   ██  WARNING
-  ██  This app is in heavy development, very feature-incomplete, even
-  ▄▄  this README is pretty inaccurate. Just FYI :3
+  ██  This app is in early development, very feature-incomplete, even
+  ▄▄  this README may be inaccurate. Just FYI :3
 
 ╱╱    ╱╱╱    ╱╱╱    ╱╱╱    ╱╱╱    ╱╱╱    ╱╱╱    ╱╱╱    ╱╱╱    ╱╱╱    ╱╱
 
@@ -82,6 +82,18 @@
     [b] Box tool          [d] Delete            [←][↓][→] Move around
     [l] Line tool         [y] Copy
     [t] Text tool         [p] Paste
+
+
+──[ COMMANDS ]─────────────────────────────────────────────────────────
+
+  sketshy uses a command system similar to vim or other modal text
+  editors. It's also got completions and aliases.
+
+    :quit                 Quits sketshy
+        :q
+
+    :export <file>        Exports the current canvas to plain UTF-8
+        :e <file>
 
 
 ──[ TO-DO ]────────────────────────────────────────────────────────────
