@@ -365,7 +365,6 @@ impl Component for Home {
                         Ok(Some(Action::RenderBuffer))
                     }
                 }
-                _ => Ok(None),
             },
             MouseEventKind::ScrollDown => Ok(Some(Action::ScrollDown)),
             MouseEventKind::ScrollUp => Ok(Some(Action::ScrollUp)),
