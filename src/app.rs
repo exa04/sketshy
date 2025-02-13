@@ -190,13 +190,13 @@ impl App {
 pub mod color_scheme {
     use ratatui::style::Color;
 
-    pub const BG_BASE: Color = Color::Rgb(17, 17, 27);
-    pub const BG_ELEVATED: Color = Color::Rgb(30, 30, 46);
-    pub const BG_CHECKERS: Color = Color::Rgb(24, 24, 37);
-    pub const BG_SELECTION: Color = Color::Rgb(49, 50, 68);
+    pub const BG_BASE: Color = Color::Rgb(9, 9, 11);
+    pub const BG_CHECKERS: Color = Color::Rgb(16, 16, 18);
+    pub const BG_ELEVATED: Color = Color::Rgb(24, 24, 27);
+    pub const BG_SELECTION: Color = Color::Rgb(63, 46, 13);
 
-    pub const FG_BASE: Color = Color::Rgb(205, 214, 244);
-    pub const FG_SECONDARY: Color = Color::Rgb(166, 173, 200);
-    pub const FG_MUTED: Color = Color::Rgb(108, 112, 134);
-    pub const FG_SELECTION: Color = Color::Rgb(137, 180, 250);
+    pub const FG_BASE: Color = Color::Rgb(228, 228, 231);
+    pub const FG_SECONDARY: Color = Color::Rgb(161, 161, 170);
+    pub const FG_MUTED: Color = Color::Rgb(113, 113, 122);
+    pub const FG_SELECTION: Color = Color::Rgb(227, 152, 0);
 }
