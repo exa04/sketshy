@@ -24,7 +24,7 @@ pub enum Tool {
     Text,
 }
 
-const LIST_WIDTH: u16 = 14;
+const LIST_WIDTH: u16 = 12;
 const STYLE_WIDTH: u16 = 20;
 
 const SCROLL_STEP: u16 = 4;
@@ -278,15 +278,17 @@ impl Component for Home {
                 Tool::Line => {
                     if let Some(Operation::Selection { origin, second }) = self.current_operation {
                         if origin != second {
+                            let (x, y, character) = Element::straight_line(
+                                origin.x as i32,
+                                origin.y as i32,
+                                second.x as i32,
+                                second.y as i32,
+                            );
+
                             self.canvas.elements.push_back(Element::Line {
-                                from: (origin.x > second.x, origin.y < second.y),
-                                to: (second.x > origin.x, second.y < origin.y),
-                                area: Rect {
-                                    x: origin.x.min(second.x),
-                                    y: origin.y.min(second.y),
-                                    width: origin.x.abs_diff(second.x) + 1,
-                                    height: origin.y.abs_diff(second.y) + 1,
-                                },
+                                from: (origin.x as i32, origin.y as i32),
+                                to: (x, y),
+                                character,
                             });
                             self.reset_tool();
                             self.selected_elements
@@ -532,8 +534,8 @@ impl Component for Home {
                     frame,
                     &canvas_area,
                     &match &self.current_operation {
-                        Some(o) => o.apply_transform(el.area()),
-                        None => *el.area(),
+                        Some(o) => o.apply_transform(&el.area()),
+                        None => el.area(),
                     },
                     &self.scroll_offset,
                 );
@@ -571,6 +573,33 @@ impl Component for Home {
                             Block::new().style(Style::new().bg(color_scheme::BG_ELEVATED)),
                             sel_area,
                         )
+                    }
+                    Tool::Line => {
+                        use line_drawing::Bresenham;
+
+                        let (x1, y1, x2, y2) = (
+                            (canvas_area.x + origin.x - self.scroll_offset.x) as i32,
+                            (canvas_area.y + origin.y - self.scroll_offset.y) as i32,
+                            (canvas_area.x + second.x - self.scroll_offset.x) as i32,
+                            (canvas_area.y + second.y - self.scroll_offset.y) as i32,
+                        );
+
+                        let (x2, y2, ch) = Element::straight_line(x1, y1, x2, y2);
+
+                        for (x, y) in Bresenham::new(
+                            (
+                                (canvas_area.x + origin.x - self.scroll_offset.x) as i32,
+                                (canvas_area.y + origin.y - self.scroll_offset.y) as i32,
+                            ),
+                            (x2, y2),
+                        ) {
+                            if let Some(cell) = frame
+                                .buffer_mut()
+                                .cell_mut(Position::from((x as u16, y as u16)))
+                            {
+                                cell.set_char(ch);
+                            }
+                        }
                     }
                     _ => {}
                 };

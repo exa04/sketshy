@@ -1,6 +1,9 @@
 use std::collections::{HashSet, VecDeque};
 
-use ratatui::{buffer::Buffer, layout::Rect};
+use ratatui::{
+    buffer::Buffer,
+    layout::{Position, Rect},
+};
 
 use super::{Element, Operation};
 
@@ -15,8 +18,8 @@ impl DrawingCanvas {
         let areas = self.elements.iter().enumerate().map(|(i, el)| {
             selected_elements
                 .get(&i)
-                .and_then(|_| operation.as_ref().map(|op| op.apply_transform(el.area())))
-                .unwrap_or_else(|| *el.area())
+                .and_then(|_| operation.as_ref().map(|op| op.apply_transform(&el.area())))
+                .unwrap_or_else(|| el.area())
         });
 
         let max_width = areas
