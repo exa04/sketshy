@@ -5,7 +5,7 @@
 ╲_______╱╲____╱___╱╲________╱ ╲______╱ ╲_______╱╲____╱____╱   ╲_____╱
 ══════════════════ plaintext charts and drawings from your terminal! ══
 
-  [ version | 0.0.0 ]  [ rust ]
+  [ version | 0.1.0 ]  [ rust ]
 
   sketshy is a TUI tool for designing "ASCII art", plaintext diagrams
   and more. It's like if Excalidraw and Vim had a kid that grew up to
@@ -107,7 +107,7 @@
           [x] Cursor tool
           [x] Box tool
           [x] Text tool
-          [ ] Line tool
+          [x] Line tool
 
       [x] Scrolling
 
