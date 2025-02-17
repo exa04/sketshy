@@ -1,9 +1,6 @@
 use std::collections::{HashSet, VecDeque};
 
-use ratatui::{
-    buffer::Buffer,
-    layout::{Position, Rect},
-};
+use ratatui::{buffer::Buffer, layout::Rect};
 
 use super::{Element, Operation};
 
