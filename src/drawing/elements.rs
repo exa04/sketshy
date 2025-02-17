@@ -115,21 +115,27 @@ impl StraightLine {
                 to: (from.x, to.y).into(),
                 direction: LineDirection::Down,
             }),
-            1.25..1.75 => Some(Self {
-                from: (from.x, from.y).into(),
-                to: (from.x - (to.y - from.y) * 2, to.y).into(),
-                direction: LineDirection::DownLeft,
-            }),
+            1.25..1.75 => {
+                let d = to.y.saturating_sub(from.y).min(from.x / 2);
+                Some(Self {
+                    from: (from.x, from.y).into(),
+                    to: (from.x - d * 2, from.y + d).into(),
+                    direction: LineDirection::DownLeft,
+                })
+            }
             1.75..2.25 => Some(Self {
                 from: (from.x, from.y).into(),
                 to: (to.x, from.y).into(),
                 direction: LineDirection::Left,
             }),
-            2.25..2.75 => Some(Self {
-                from: (from.x, from.y).into(),
-                to: (from.x - (from.y - to.y) * 2, to.y).into(),
-                direction: LineDirection::UpLeft,
-            }),
+            2.25..2.75 => {
+                let d = from.y.saturating_sub(to.y).min(from.x / 2);
+                Some(Self {
+                    from: (from.x, from.y).into(),
+                    to: (from.x - d * 2, from.y - d).into(),
+                    direction: LineDirection::UpLeft,
+                })
+            }
             2.75..3.25 => Some(Self {
                 from: (from.x, from.y).into(),
                 to: (from.x, to.y).into(),
@@ -193,7 +199,7 @@ impl StraightLine {
                     .map(Position::from)
                 {
                     if let Some(cell) = buffer.cell_mut(pos) {
-                        cell.set_char('＼');
+                        cell.set_symbol("＼");
                         cell.set_style(style);
                     }
                 }
@@ -213,7 +219,7 @@ impl StraightLine {
                     .map(Position::from)
                 {
                     if let Some(cell) = buffer.cell_mut(pos) {
-                        cell.set_char('／');
+                        cell.set_symbol("／");
                         cell.set_style(style);
                     }
                 }
@@ -233,7 +239,7 @@ impl StraightLine {
                     .map(Position::from)
                 {
                     if let Some(cell) = buffer.cell_mut(pos) {
-                        cell.set_char('＼');
+                        cell.set_symbol("＼");
                         cell.set_style(style);
                     }
                 }
@@ -253,7 +259,7 @@ impl StraightLine {
                     .map(Position::from)
                 {
                     if let Some(cell) = buffer.cell_mut(pos) {
-                        cell.set_char('／');
+                        cell.set_symbol("／");
                         cell.set_style(style);
                     }
                 }
