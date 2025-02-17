@@ -118,7 +118,68 @@ impl Component for Home {
                             Ok(None)
                         } else {
                             if self.selected_elements.len() == 1 {
-                                if let Some(direction) = self
+                                if let Some(Element::Line(line)) = self
+                                    .selected_elements
+                                    .iter()
+                                    .next()
+                                    .and_then(|i| self.canvas.elements.get(*i))
+                                {
+                                    use crate::drawing::elements::LineDirection::*;
+
+                                    let handles = match &line.direction {
+                                        Right => [
+                                            (line.from.x as i16 - 1, line.from.y as i16),
+                                            (line.to.x as i16 + 1, line.to.y as i16),
+                                        ],
+                                        DownRight => [
+                                            (line.from.x as i16 - 2, line.from.y as i16 - 1),
+                                            (line.to.x as i16 + 2, line.to.y as i16 + 1),
+                                        ],
+                                        Down => [
+                                            (line.from.x as i16, line.from.y as i16 - 1),
+                                            (line.to.x as i16, line.to.y as i16 + 1),
+                                        ],
+                                        DownLeft => [
+                                            (line.from.x as i16 + 2, line.from.y as i16 - 1),
+                                            (line.to.x as i16 - 2, line.to.y as i16 + 1),
+                                        ],
+                                        Left => [
+                                            (line.from.x as i16 + 1, line.from.y as i16),
+                                            (line.to.x as i16 - 1, line.to.y as i16),
+                                        ],
+                                        UpLeft => [
+                                            (line.from.x as i16 + 2, line.from.y as i16 + 1),
+                                            (line.to.x as i16 - 2, line.to.y as i16 - 1),
+                                        ],
+                                        Up => [
+                                            (line.from.x as i16, line.from.y as i16 + 1),
+                                            (line.to.x as i16, line.to.y as i16 - 1),
+                                        ],
+                                        UpRight => [
+                                            (line.from.x as i16 - 2, line.from.y as i16 + 1),
+                                            (line.to.x as i16 + 2, line.to.y as i16 - 1),
+                                        ],
+                                    };
+
+                                    if handles[0].0 + self.scroll_offset.x as i16 == column as i16
+                                        && handles[0].1 + self.scroll_offset.y as i16 == row as i16
+                                    {
+                                        self.current_operation = Some(Operation::MoveLineHandle {
+                                            handle: crate::drawing::LineHandle::First,
+                                            pos: (column, row).into(),
+                                        });
+                                        return Ok(Some(Action::RenderBuffer));
+                                    } else if handles[1].0 + self.scroll_offset.x as i16
+                                        == column as i16
+                                        && handles[1].1 + self.scroll_offset.y as i16 == row as i16
+                                    {
+                                        self.current_operation = Some(Operation::MoveLineHandle {
+                                            handle: crate::drawing::LineHandle::Second,
+                                            pos: (column, row).into(),
+                                        });
+                                        return Ok(Some(Action::RenderBuffer));
+                                    }
+                                } else if let Some(direction) = self
                                     .selected_elements
                                     .iter()
                                     .filter_map(|i| {
@@ -241,14 +302,11 @@ impl Component for Home {
 
                             Ok(Some(Action::RenderBuffer))
                         }
-                        Some(Operation::Move { origin: _, second })
-                        | Some(Operation::Resize {
-                            direction: _,
-                            origin: _,
-                            second,
-                        }) => {
-                            second.x = column;
-                            second.y = row;
+                        Some(Operation::Move { second: pos, .. })
+                        | Some(Operation::Resize { second: pos, .. })
+                        | Some(Operation::MoveLineHandle { pos, .. }) => {
+                            pos.x = column;
+                            pos.y = row;
                             Ok(Some(Action::RenderBuffer))
                         }
                         _ => Ok(None),
@@ -349,7 +407,9 @@ impl Component for Home {
                 Tool::Cursor => {
                     if let Some(op) = &self.current_operation {
                         for i in &self.selected_elements {
-                            self.canvas.elements[*i].transform(|area| op.apply_transform(area));
+                            if let Some(element) = op.apply_transform(&self.canvas.elements[*i]) {
+                                self.canvas.elements[*i] = element;
+                            }
                         }
                         self.current_operation = None;
                         Ok(Some(Action::RenderBuffer))
@@ -521,15 +581,69 @@ impl Component for Home {
                 .next()
                 .and_then(|i| self.canvas.elements.get(*i))
             {
-                draw_resize_handles(
-                    frame,
-                    &canvas_area,
-                    &match &self.current_operation {
-                        Some(o) => o.apply_transform(&el.area()),
-                        None => el.area(),
-                    },
-                    &self.scroll_offset,
-                );
+                let trans = self
+                    .current_operation
+                    .as_ref()
+                    .and_then(|op| op.apply_transform(el));
+
+                let el = trans.as_ref().unwrap_or(el);
+
+                if let Element::Line(line) = el {
+                    use crate::drawing::LineDirection::*;
+                    let style = Style::new().fg(color_scheme::FG_SELECTION);
+
+                    match line.direction {
+                        Right => [
+                            (line.from.x as i16 - 1, line.from.y as i16),
+                            (line.to.x as i16 + 1, line.to.y as i16),
+                        ],
+                        DownRight => [
+                            (line.from.x as i16 - 2, line.from.y as i16 - 1),
+                            (line.to.x as i16 + 2, line.to.y as i16 + 1),
+                        ],
+                        Down => [
+                            (line.from.x as i16, line.from.y as i16 - 1),
+                            (line.to.x as i16, line.to.y as i16 + 1),
+                        ],
+                        DownLeft => [
+                            (line.from.x as i16 + 2, line.from.y as i16 - 1),
+                            (line.to.x as i16 - 2, line.to.y as i16 + 1),
+                        ],
+                        Left => [
+                            (line.to.x as i16 - 1, line.to.y as i16),
+                            (line.from.x as i16 + 1, line.from.y as i16),
+                        ],
+                        UpLeft => [
+                            (line.to.x as i16 - 2, line.to.y as i16 - 1),
+                            (line.from.x as i16 + 2, line.from.y as i16 + 1),
+                        ],
+                        Up => [
+                            (line.to.x as i16, line.to.y as i16 - 1),
+                            (line.from.x as i16, line.from.y as i16 + 1),
+                        ],
+                        UpRight => [
+                            (line.to.x as i16 + 2, line.to.y as i16 - 1),
+                            (line.from.x as i16 - 2, line.from.y as i16 + 1),
+                        ],
+                    }
+                    .into_iter()
+                    .map(|(x, y)| {
+                        (
+                            area.x.checked_add_signed(
+                                x - self.scroll_offset.x as i16 + canvas_area.x as i16,
+                            ),
+                            area.y.checked_add_signed(
+                                y - self.scroll_offset.y as i16 + canvas_area.y as i16,
+                            ),
+                        )
+                    })
+                    .filter_map(|(x, y)| x.zip(y).map(Position::from))
+                    .filter(|pos| canvas_area.contains(*pos))
+                    .map(|Position { x, y }| (Rect::new(x, y, 1, 1), Span::styled("■", style)))
+                    .for_each(|(rect, s)| frame.render_widget(s, rect));
+                } else {
+                    draw_resize_handles(frame, &canvas_area, &el.area(), &self.scroll_offset);
+                }
             }
         }
 

@@ -1,5 +1,5 @@
 use ratatui::{
-    layout::{Position, Rect},
+    layout::{Offset, Position, Rect},
     style::Style,
     widgets::{Block, Clear, Paragraph, Widget},
 };
@@ -30,15 +30,6 @@ impl Element {
         }
     }
 
-    pub fn transform<F: Fn(&Rect) -> Rect>(&mut self, transform: F) {
-        match self {
-            Self::Box { ref mut area } | Self::Text { ref mut area, .. } => {
-                *area = transform(area);
-            }
-            _ => (),
-        }
-    }
-
     pub(crate) fn draw_to(
         &self,
         buffer: &mut ratatui::prelude::Buffer,
@@ -53,34 +44,21 @@ impl Element {
             Style::new().fg(color_scheme::FG_BASE)
         };
 
-        match self {
-            Self::Box { area } => {
-                let area = match &operation {
-                    Some(x) => x.apply_transform(area),
-                    None => *area,
-                };
+        let trans = operation.clone().and_then(|op| op.apply_transform(self));
+        let el = trans.as_ref().unwrap_or(self);
 
-                Clear.render(area, buffer);
-                Block::bordered().style(style).render(area, buffer);
+        match el {
+            Self::Box { area } => {
+                Clear.render(*area, buffer);
+                Block::bordered().style(style).render(*area, buffer);
             }
             Self::Text { area, content } => {
-                let area = match &operation {
-                    Some(x) => x.apply_transform(area),
-                    None => *area,
-                };
-
                 Paragraph::new(content.as_str())
                     .style(style)
-                    .render(area, buffer);
+                    .render(*area, buffer);
             }
             Self::Line(line) => {
                 line.render_to(buffer, style);
-                // for (x, y) in Bresenham::new((from.0, from.1), (to.0, to.1)) {
-                //     if let Some(cell) = buffer.cell_mut(Position::from((x as u16, y as u16))) {
-                //         cell.set_char(*character);
-                //         cell.set_style(style);
-                //     }
-                // }
             }
         }
     }
@@ -88,9 +66,9 @@ impl Element {
 
 #[derive(Clone)]
 pub struct StraightLine {
-    from: Position,
-    to: Position,
-    direction: LineDirection,
+    pub from: Position,
+    pub to: Position,
+    pub direction: LineDirection,
 }
 
 #[derive(Clone)]
@@ -121,7 +99,7 @@ impl StraightLine {
             3.0 + x / (x - y)
         };
 
-        match diamond_angle {
+        match diamond_angle % 4.0 {
             ..0.25 | 3.75.. => Some(Self {
                 from: (from.x, from.y).into(),
                 to: (to.x, from.y).into(),
@@ -163,6 +141,19 @@ impl StraightLine {
                 direction: LineDirection::UpRight,
             }),
             _ => None,
+        }
+    }
+    pub fn offset(&self, offset: Offset) -> StraightLine {
+        StraightLine {
+            from: Position {
+                x: self.from.x.saturating_add_signed(offset.x as i16),
+                y: self.from.y.saturating_add_signed(offset.y as i16),
+            },
+            to: Position {
+                x: self.to.x.saturating_add_signed(offset.x as i16),
+                y: self.to.y.saturating_add_signed(offset.y as i16),
+            },
+            direction: self.direction.clone(),
         }
     }
     pub fn area(&self) -> Rect {

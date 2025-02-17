@@ -16,10 +16,14 @@ pub struct DrawingCanvas {
 impl DrawingCanvas {
     pub fn render(&mut self, selected_elements: &HashSet<usize>, operation: &Option<Operation>) {
         let areas = self.elements.iter().enumerate().map(|(i, el)| {
-            selected_elements
+            if let Some(el) = selected_elements
                 .get(&i)
-                .and_then(|_| operation.as_ref().map(|op| op.apply_transform(&el.area())))
-                .unwrap_or_else(|| el.area())
+                .and_then(|_| operation.as_ref().and_then(|op| op.apply_transform(el)))
+            {
+                el.area()
+            } else {
+                el.area()
+            }
         });
 
         let max_width = areas
