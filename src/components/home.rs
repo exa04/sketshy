@@ -13,7 +13,7 @@ use crate::{
     action::Action,
     app::color_scheme,
     config::Config,
-    drawing::{Direction, DrawingCanvas, Element, Operation},
+    drawing::{Direction, DrawingCanvas, Element, Operation, StraightLine},
 };
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -278,18 +278,9 @@ impl Component for Home {
                 Tool::Line => {
                     if let Some(Operation::Selection { origin, second }) = self.current_operation {
                         if origin != second {
-                            let (x, y, character) = Element::straight_line(
-                                origin.x as i32,
-                                origin.y as i32,
-                                second.x as i32,
-                                second.y as i32,
-                            );
-
-                            self.canvas.elements.push_back(Element::Line {
-                                from: (origin.x as i32, origin.y as i32),
-                                to: (x, y),
-                                character,
-                            });
+                            if let Some(line) = StraightLine::new(origin, second) {
+                                self.canvas.elements.push_back(Element::Line(line));
+                            }
                             self.reset_tool();
                             self.selected_elements
                                 .insert(self.canvas.elements.len() - 1);
@@ -575,33 +566,20 @@ impl Component for Home {
                         )
                     }
                     Tool::Line => {
-                        use line_drawing::Bresenham;
-
-                        let (x1, y1, x2, y2) = (
-                            (canvas_area.x + origin.x - self.scroll_offset.x) as i32,
-                            (canvas_area.y + origin.y - self.scroll_offset.y) as i32,
-                            (canvas_area.x + second.x - self.scroll_offset.x) as i32,
-                            (canvas_area.y + second.y - self.scroll_offset.y) as i32,
-                        );
-
-                        let (x2, y2, ch) = Element::straight_line(x1, y1, x2, y2);
-
-                        for (x, y) in Bresenham::new(
-                            (
-                                (canvas_area.x + origin.x - self.scroll_offset.x) as i32,
-                                (canvas_area.y + origin.y - self.scroll_offset.y) as i32,
+                        StraightLine::new(
+                            Position::new(
+                                canvas_area.x + origin.x - self.scroll_offset.x,
+                                canvas_area.y + origin.y - self.scroll_offset.y,
                             ),
-                            (x2, y2),
-                        ) {
-                            if let Some(cell) = frame
-                                .buffer_mut()
-                                .cell_mut(Position::from((x as u16, y as u16)))
-                            {
-                                cell.set_char(ch);
-                            }
-                        }
+                            Position::new(
+                                canvas_area.x + second.x - self.scroll_offset.x,
+                                canvas_area.y + second.y - self.scroll_offset.y,
+                            ),
+                        )
+                        .inspect(|l| {
+                            l.render_to(frame.buffer_mut(), Style::new().fg(color_scheme::FG_BASE))
+                        });
                     }
-                    _ => {}
                 };
             }
             Some(Operation::EditText { textarea }) => {

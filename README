@@ -127,6 +127,7 @@
       Tools
           [ ] Paint tool
           [ ] Circle tool
+		  [ ] Diamond tool
 
       [ ] Ctrl-drag for even scaling
       [ ] Ruler and guides
@@ -156,6 +157,9 @@
 
       Config
           [ ] Theming
+		  [ ] Other options
+	          - Select Cursor after adding shape
+			  - Show / hide toolbar
 
 
   0.4.0
